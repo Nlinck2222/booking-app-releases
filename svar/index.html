@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Svar på invitation</title>
+<!--
+  Svarsiden til mødeinvitationer (booking-appens v883, src/meetingReplies.ts). Udgives med scripts/publish-reply-page.sh
+  til GitHub Pages (Nlinck2222/booking-app-releases). Linket i mailen har ?t=<token>&a=<svar>; siden viser mødet og
+  gemmer først svaret ved klik på "Send svar" (link-scannere åbner links på forhånd). Den offentlige nøgle kan kun kalde
+  meeting_reply_info/meeting_reply_set (migration 057) — ingen andre data.
+-->
+<style>
+  :root { --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; --muted: #6e6e73; --line: #e3e3e6; --accent: #1d1d1f; --accentText: #ffffff;
+          --yes: #2e7d32; --maybe: #b26a00; --no: #c62828; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111113; --card: #1c1c1f; --text: #f5f5f7; --muted: #a1a1a6; --line: #2c2c30; --accent: #f5f5f7; --accentText: #111113;
+            --yes: #64cc7c; --maybe: #ffcc00; --no: #ff6b6b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 460px; margin: 0 auto; padding: 48px 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 28px 24px; }
+  .sender { font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+  h1 { font-size: 20px; margin: 0 0 14px; line-height: 1.3; }
+  .row { margin: 0 0 4px; }
+  .muted { color: var(--muted); }
+  .choices { display: flex; flex-direction: column; gap: 8px; margin: 22px 0 16px; }
+  .choice { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px;
+            background: transparent; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+  .choice .mark { width: 18px; text-align: center; font-weight: 800; }
+  .choice[aria-pressed="true"] { border-color: var(--text); }
+  .choice[data-v="accepted"] .mark { color: var(--yes); }
+  .choice[data-v="tentative"] .mark { color: var(--maybe); }
+  .choice[data-v="declined"] .mark { color: var(--no); }
+  .send { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: var(--accentText); font: inherit; font-weight: 700; cursor: pointer; }
+  .send:disabled { opacity: 0.35; cursor: default; }
+  .note { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
+  .done { font-size: 17px; font-weight: 700; margin: 0 0 6px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <div id="loading" class="muted">…</div>
+    <div id="invalid" hidden>
+      <h1 id="invalidTitle"></h1>
+      <p class="muted" id="invalidText"></p>
+    </div>
+    <div id="meeting" hidden>
+      <p class="sender" id="sender"></p>
+      <h1 id="title"></h1>
+      <p class="row" id="when"></p>
+      <p class="row muted" id="place"></p>
+      <div id="form">
+        <div class="choices" id="choices"></div>
+        <button class="send" id="send" disabled></button>
+        <p class="note" id="current" hidden></p>
+      </div>
+      <div id="thanks" hidden>
+        <p class="done" id="doneText"></p>
+        <p class="note" id="changeNote"></p>
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+(() => {
+  const SUPABASE_URL = 'https://roiwjhggrtmwppbaqxtd.supabase.co';
+  const PUBLIC_KEY = 'sb_publishable_IzZ68IhECcV2T50QwpNqfg_vkfZxoZS';
+  const T = {
+    da: { title: 'Svar på invitation', invited: s => `${s} har inviteret dig`, hello: n => `Hej ${n}`, send: 'Send svar', sending: 'Sender…',
+          accepted: 'Jeg kommer', tentative: 'Måske', declined: 'Kan ikke', current: s => `Dit nuværende svar: ${s}`,
+          thanks: s => `Tak — dit svar er sendt: ${s}`, change: 'Du kan ændre dit svar når som helst via linket i mailen.',
+          invalidTitle: 'Linket virker ikke længere', invalidText: 'Mødet er måske afholdt, aflyst eller ændret. Kontakt den, der inviterede dig.',
+          error: 'Svaret kunne ikke sendes. Prøv igen om lidt.' },
+    en: { title: 'Reply to invitation', invited: s => `${s} has invited you`, hello: n => `Hi ${n}`, send: 'Send reply', sending: 'Sending…',
+          accepted: 'Attending', tentative: 'Maybe', declined: 'Can’t attend', current: s => `Your current reply: ${s}`,
+          thanks: s => `Thank you — your reply has been sent: ${s}`, change: 'You can change your reply at any time using the link in the email.',
+          invalidTitle: 'This link no longer works', invalidText: 'The meeting may have taken place, been cancelled or changed. Please contact the person who invited you.',
+          error: 'Your reply could not be sent. Please try again shortly.' },
+  };
+  const MARK = { accepted: '✓', tentative: '?', declined: '✕' };
+  const params = new URLSearchParams(location.search);
+  const token = params.get('t') || '';
+  let choice = ['accepted', 'tentative', 'declined'].includes(params.get('a')) ? params.get('a') : null;
+  let lang = (navigator.language || 'da').toLowerCase().startsWith('da') ? 'da' : 'en';
+  const $ = id => document.getElementById(id);
+  const rpc = (fn, body) => fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST', headers: { apikey: PUBLIC_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+
+  const showInvalid = () => {
+    const t = T[lang];
+    document.title = t.title;
+    $('loading').hidden = true; $('meeting').hidden = true; $('invalid').hidden = false;
+    $('invalidTitle').textContent = t.invalidTitle; $('invalidText').textContent = t.invalidText;
+  };
+
+  const renderChoices = () => {
+    const t = T[lang];
+    const box = $('choices');
+    box.textContent = '';
+    ['accepted', 'tentative', 'declined'].forEach(v => {
+      const b = document.createElement('button');
+      b.className = 'choice'; b.dataset.v = v; b.type = 'button';
+      b.setAttribute('aria-pressed', String(choice === v));
+      const m = document.createElement('span'); m.className = 'mark'; m.textContent = MARK[v];
+      const l = document.createElement('span'); l.textContent = t[v];
+      b.append(m, l);
+      b.onclick = () => { choice = v; renderChoices(); };
+      box.append(b);
+    });
+    $('send').disabled = !choice;
+  };
+
+  if (token.length < 32) { showInvalid(); return; }
+  rpc('meeting_reply_info', { p_token: token }).then(info => {
+    if (!info) { showInvalid(); return; }
+    if (info.lang === 'da' || info.lang === 'en') lang = info.lang;
+    const t = T[lang];
+    document.documentElement.lang = lang;
+    document.title = t.title;
+    $('sender').textContent = info.sender ? t.invited(info.sender) : (info.name ? t.hello(info.name) : '');
+    $('title').textContent = info.title || t.title;
+    $('when').textContent = info.when || '';
+    $('place').textContent = info.place || '';
+    $('send').textContent = t.send;
+    if (info.status && MARK[info.status]) { $('current').hidden = false; $('current').textContent = t.current(t[info.status]); if (!choice) choice = info.status; }
+    renderChoices();
+    $('loading').hidden = true; $('meeting').hidden = false;
+    $('send').onclick = () => {
+      if (!choice) return;
+      $('send').disabled = true; $('send').textContent = t.sending;
+      rpc('meeting_reply_set', { p_token: token, p_status: choice }).then(ok => {
+        if (!ok) { showInvalid(); return; }
+        $('form').hidden = true; $('thanks').hidden = false;
+        $('doneText').textContent = t.thanks(t[choice]);
+        $('changeNote').textContent = t.change;
+      }).catch(() => { $('send').disabled = false; $('send').textContent = t.send; alert(t.error); });
+    };
+  }).catch(showInvalid);
+})();
+</script>
+</body>
+</html>
