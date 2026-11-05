@@ -10,7 +10,7 @@
   Delt projektmappe (booking-appens v895, src/projectShare.tsx, migration 061). Udgives med scripts/publish-reply-page.sh
   til GitHub Pages (Nlinck2222/booking-app-releases → /projekt/). Linket har ?k=<token>. Kun visning: siden kalder
   get_shared_project med den offentlige nøgle og får kun mappens rækker og bookinger — ingen kunder, priser eller noter.
-  Kun tidslinjen (Nicolai: listen under behøves ikke). Henter igen hvert minut og når fanen får fokus. Dag-indeks fra mandag 30. dec 2024, som i appen.
+  Kun tidslinjen (Nicolai: listen under behøves ikke) + zoom og scrubber. Henter igen hvert minut og når fanen får fokus. Dag-indeks fra mandag 30. dec 2024, som i appen.
 -->
 <style>
   :root { --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; --muted: #6e6e73; --line: #e3e3e6; --grid: #eeeef0; --weekend: #f7f7f9;
@@ -62,6 +62,13 @@
          box-shadow: inset 0 -1px 0 rgba(0,0,0,.15); text-shadow: 0 1px 1px rgba(0,0,0,.25); }
   .bar .ep { opacity: .85; font-weight: 500; margin-left: 5px; }
   .empty { padding: 24px; color: var(--muted); }
+  .scrub { margin-top: 12px; padding: 0 2px; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .strack { position: relative; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); cursor: pointer; overflow: hidden; }
+  .tick { position: absolute; top: 18px; height: 8px; border-radius: 2px; opacity: .85; }
+  .smark { position: absolute; top: 3px; font-size: 10px; color: var(--muted); padding-left: 4px; border-left: 1px solid var(--line); height: 100%; white-space: nowrap; pointer-events: none; }
+  .stoday { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--today); opacity: .7; pointer-events: none; }
+  .sthumb { position: absolute; top: 0; bottom: 0; border: 2px solid var(--text); border-radius: 7px; background: rgba(127,127,127,.12); cursor: grab; box-sizing: border-box; min-width: 10px; }
+  .scrub:active .sthumb { cursor: grabbing; }
   .foot { margin-top: 18px; font-size: 12px; color: var(--muted); }
   @media (max-width: 600px) {
     .label { flex-basis: 110px; width: 110px; padding: 8px; }
@@ -96,6 +103,7 @@
       </div>
     </header>
     <div class="card scroller"><div class="grid" id="grid"></div></div>
+    <div class="scrub" id="scrub"></div>
     <p class="foot" id="foot"></p>
   </div>
 </main>
@@ -136,8 +144,9 @@
   const months = z => ({ '1m': 1, '3m': 3, '6m': 6 }[z] || 0);
   // Periodens start (dag-indeks) for en dato: mandagen i ugen eller den 1. i måneden
   const periodStart = (d, z) => months(z) ? indexOf(new Date(d.getFullYear(), d.getMonth(), 1)) : indexOf(d) - ((d.getDay() + 6) % 7);
-  const periodLen = (i0, z) => { if (!months(z)) return z === '7d' ? 7 : 14; const d = dateOf(i0); return indexOf(new Date(d.getFullYear(), d.getMonth() + months(z), 1)) - i0; };
-  const shiftStart = (i0, z, dir) => { if (!months(z)) return i0 + dir * (z === '7d' ? 7 : 14); const d = dateOf(i0); return indexOf(new Date(d.getFullYear(), d.getMonth() + dir * months(z), 1)); };
+  // Efter scrubberen kan perioden starte midt i en måned — så bruges samme dato i måneden
+  const periodLen = (i0, z) => { if (!months(z)) return z === '7d' ? 7 : 14; const d = dateOf(i0); return indexOf(new Date(d.getFullYear(), d.getMonth() + months(z), d.getDate())) - i0; };
+  const shiftStart = (i0, z, dir) => { if (!months(z)) return i0 + dir * (z === '7d' ? 7 : 14); const d = dateOf(i0); return indexOf(new Date(d.getFullYear(), d.getMonth() + dir * months(z), d.getDate())); };
 
   let data = null;
   const now = new Date();
@@ -176,10 +185,49 @@
   const locale = lang === 'da' ? 'da-DK' : 'en-GB';
   const periodLabel = (i0, n) => {
     const a = dateOf(i0), z = dateOf(i0 + n - 1);
-    if (months(zoom) === 1) return `${T.months[a.getMonth()]} ${a.getFullYear()}`;
-    if (months(zoom)) return `${T.months[a.getMonth()].slice(0, 3)}${a.getFullYear() !== z.getFullYear() ? ' ' + a.getFullYear() : ''} – ${T.months[z.getMonth()].slice(0, 3)} ${z.getFullYear()}`;
+    const aligned = a.getDate() === 1;
+    if (aligned && months(zoom) === 1) return `${T.months[a.getMonth()]} ${a.getFullYear()}`;
+    if (aligned && months(zoom)) return `${T.months[a.getMonth()].slice(0, 3)}${a.getFullYear() !== z.getFullYear() ? ' ' + a.getFullYear() : ''} – ${T.months[z.getMonth()].slice(0, 3)} ${z.getFullYear()}`;
     return `${a.toLocaleDateString(locale, { day: 'numeric', month: 'short' })} – ${z.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}`;
   };
+
+  // Scrubber (Nicolai: "en scrubber i bunden"): hele projektets forløb med en streg pr. booking og et vindue for det
+  // viste udsnit. Træk i vinduet, eller klik/træk på sporet. Spænder fra første til sidste booking (og i dag) ± 2 uger
+  const span = () => {
+    const todayI = indexOf(now);
+    let a = todayI, z = todayI;
+    for (const b of data.bookings) { a = Math.min(a, b.start_day); z = Math.max(z, b.start_day + Math.max(1, b.duration)); }
+    return { a: a - 14, z: z + 14 };
+  };
+  const renderScrubber = (i0, n) => {
+    const { a, z } = span(), total = Math.max(1, z - a);
+    const pct = i => ((i - a) / total) * 100;
+    const rowColor = Object.fromEntries(data.rows.map(r => [r.id, r.color]));
+    const ticks = data.bookings.map(b => `<div class="tick" style="left:${pct(b.start_day)}%;width:max(2px, ${(Math.max(1, b.duration) / total) * 100}%);background:${esc(b.color || rowColor[b.row_id] || '#888')}"></div>`).join('');
+    const todayI = indexOf(now);
+    // Månedsmærker langs sporet
+    let marks = '', d = dateOf(a); d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    const every = total > 400 ? 3 : 1;
+    for (; indexOf(d) < z; d = new Date(d.getFullYear(), d.getMonth() + every, 1)) {
+      marks += `<div class="smark" style="left:${pct(indexOf(d))}%">${esc(T.months[d.getMonth()].slice(0, 3))}${d.getMonth() === 0 ? ' ' + d.getFullYear() : ''}</div>`;
+    }
+    const left = Math.max(0, Math.min(100, pct(i0))), width = Math.min(100 - left, (n / total) * 100);
+    $('scrub').innerHTML = `<div class="strack" id="strack">${marks}${ticks}<div class="stoday" style="left:${pct(todayI)}%"></div><div class="sthumb" id="sthumb" style="left:${left}%;width:${width}%"></div></div>`;
+  };
+  // Træk: vinduets midte følger musen/fingeren
+  let scrubbing = false, raf = 0;
+  const scrubTo = clientX => {
+    const track = $('strack'); if (!track || !data) return;
+    const rect = track.getBoundingClientRect(), { a, z } = span();
+    const n = periodLen(start, zoom);
+    const day = a + ((clientX - rect.left) / rect.width) * (z - a);
+    start = Math.round(Math.max(a, Math.min(z - n, day - n / 2)));
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(render);
+  };
+  $('scrub').addEventListener('pointerdown', e => { if (!e.target.closest('.strack')) return; scrubbing = true; e.currentTarget.setPointerCapture(e.pointerId); scrubTo(e.clientX); });
+  $('scrub').addEventListener('pointermove', e => { if (scrubbing) scrubTo(e.clientX); });
+  $('scrub').addEventListener('pointerup', () => { scrubbing = false; });
+  $('scrub').addEventListener('pointercancel', () => { scrubbing = false; });
 
   const render = () => {
     $('loading').hidden = true; $('invalid').hidden = true; $('view').hidden = false;
@@ -246,6 +294,7 @@
     grid.className = `grid ${mode}`;
     grid.innerHTML = monthRow + head + (data.rows.length ? rows : `<div class="empty">${T.none}</div>`);
 
+    renderScrubber(i0, n);
     $('foot').textContent = [T.readOnly, data.expires_at ? T.expires(new Date(data.expires_at).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })) : ''].filter(Boolean).join(' ');
   };
 
