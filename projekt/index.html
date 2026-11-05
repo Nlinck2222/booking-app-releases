@@ -30,14 +30,21 @@
   .sub { font-size: 13px; color: var(--muted); margin: 2px 0 0; }
   .nav { display: flex; align-items: center; gap: 6px; margin-left: auto; }
   .nav button { border: 1px solid var(--line); background: var(--btn); color: var(--text); border-radius: 6px; height: 30px; min-width: 30px; padding: 0 10px; font: inherit; font-weight: 600; cursor: pointer; }
-  .nav .month { min-width: 130px; text-align: center; font-weight: 700; }
+  .nav .month { min-width: 150px; text-align: center; font-weight: 700; white-space: nowrap; }
+  .zooms { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-right: 8px; }
+  .nav .zooms button { border: none; border-radius: 0; background: transparent; height: 28px; min-width: 36px; padding: 0 8px; font-size: 12px; color: var(--muted); }
+  .nav .zooms button + button { border-left: 1px solid var(--line); }
+  .nav .zooms button.on { background: var(--btn); color: var(--text); }
+  .months .mseg { flex: none; font-size: 11px; font-weight: 700; padding: 5px 8px; border-right: 1px solid var(--grid); white-space: nowrap; overflow: hidden; }
+  .grid.tiny .day { border-right-color: transparent; }
+  .grid.tiny .day.mon { box-shadow: inset 1px 0 0 var(--grid); }
+  .mtiny { position: relative; z-index: 1; font-size: 10px; text-align: left; padding-left: 2px; white-space: nowrap; }
+  .head .day { position: relative; }
   :root { color-scheme: light dark; }
   .scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; background: var(--card); border-radius: 12px; }
   .grid { position: relative; min-width: max-content; }
   .head, .row { display: flex; border-bottom: 1px solid var(--line); }
   .row:last-child { border-bottom: none; }
-  .row.pad, .row:has(+ .row.pad) { border-bottom: none; }
-  .row.pad .label { padding: 0; }
   .label { position: sticky; left: 0; z-index: 3; flex: 0 0 150px; width: 150px; padding: 8px 12px; background: var(--card); border-right: 1px solid var(--line);
            display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; overflow: hidden; }
   .label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -58,8 +65,10 @@
   .foot { margin-top: 18px; font-size: 12px; color: var(--muted); }
   @media (max-width: 600px) {
     .label { flex-basis: 110px; width: 110px; padding: 8px; }
-    .nav { margin-left: 0; width: 100%; }
-    .nav .month { flex: 1; }
+    .nav { margin-left: 0; width: 100%; flex-wrap: wrap; }
+    .nav .month { flex: 1; min-width: 0; }
+    .zooms { width: 100%; margin: 0 0 6px; }
+    .nav .zooms button { flex: 1; }
   }
   [hidden] { display: none !important; }
 </style>
@@ -79,6 +88,7 @@
         <p class="sub" id="project"></p>
       </div>
       <div class="nav">
+        <div class="zooms" id="zooms"></div>
         <button id="prev" aria-label="‹">‹</button>
         <div class="month" id="month"></div>
         <button id="next" aria-label="›">›</button>
@@ -99,12 +109,12 @@
   document.documentElement.lang = lang;
   const T = {
     da: { invalidTitle: 'Linket virker ikke længere', invalidText: 'Det er måske stoppet eller udløbet. Kontakt den, der delte det med dig.',
-          today: 'I dag', none: 'Ingen bookinger i denne måned.', project: p => `Projekt: ${p}`,
+          today: 'I dag', none: 'Ingen bookinger.', project: p => `Projekt: ${p}`,
           expires: d => `Linket udløber ${d}.`, readOnly: 'Kun visning. Siden opdaterer sig selv.', 
           months: ['Januar','Februar','Marts','April','Maj','Juni','Juli','August','September','Oktober','November','December'],
           wd: ['Ma','Ti','On','To','Fr','Lø','Sø'] },
     en: { invalidTitle: 'This link no longer works', invalidText: 'It may have been stopped or expired. Contact the person who shared it with you.',
-          today: 'Today', none: 'No bookings this month.', project: p => `Project: ${p}`,
+          today: 'Today', none: 'No bookings.', project: p => `Project: ${p}`,
           expires: d => `The link expires ${d}.`, readOnly: 'View only. The page updates itself.', 
           months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
           wd: ['Mo','Tu','We','Th','Fr','Sa','Su'] },
@@ -114,12 +124,24 @@
   const EPOCH = new Date(2024, 11, 30);   // tidslinjens dag 0 (mandag), som booking-appen
   const dateOf = i => new Date(EPOCH.getFullYear(), EPOCH.getMonth(), EPOCH.getDate() + i);
   const indexOf = d => Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - EPOCH) / 86400000);
-  const DW = window.innerWidth < 600 ? 30 : 36;   // dagbredde i px
   const mins = t => { if (!t) return null; const [h, m] = t.split(':').map(Number); return isNaN(h) ? null : h * 60 + (m || 0); };
+  const LABEL_W = () => (window.innerWidth < 600 ? 110 : 150);
+
+  // Zoom som i appen (Nicolai: "man skal kunne vælge hvor stort et view man vil se … som i appen med zoom knapperne").
+  // Dagbredden fylder bredden ud; valget huskes i browseren
+  const ZOOMS = [{ id: '7d', label: '7D' }, { id: '14d', label: '14D' }, { id: '1m', label: '1M' }, { id: '3m', label: '3M' }, { id: '6m', label: '6M' }];
+  const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  let zoom = ZOOMS.some(z => z.id === lsGet('projektZoom')) ? lsGet('projektZoom') : '1m';
+  const months = z => ({ '1m': 1, '3m': 3, '6m': 6 }[z] || 0);
+  // Periodens start (dag-indeks) for en dato: mandagen i ugen eller den 1. i måneden
+  const periodStart = (d, z) => months(z) ? indexOf(new Date(d.getFullYear(), d.getMonth(), 1)) : indexOf(d) - ((d.getDay() + 6) % 7);
+  const periodLen = (i0, z) => { if (!months(z)) return z === '7d' ? 7 : 14; const d = dateOf(i0); return indexOf(new Date(d.getFullYear(), d.getMonth() + months(z), 1)) - i0; };
+  const shiftStart = (i0, z, dir) => { if (!months(z)) return i0 + dir * (z === '7d' ? 7 : 14); const d = dateOf(i0); return indexOf(new Date(d.getFullYear(), d.getMonth() + dir * months(z), 1)); };
 
   let data = null;
   const now = new Date();
-  let view = { y: now.getFullYear(), m: now.getMonth() };
+  let start = periodStart(now, zoom);
 
   const showInvalid = () => {
     $('loading').hidden = true; $('view').hidden = true; $('invalid').hidden = false;
@@ -138,11 +160,11 @@
       const first = !data;
       data = d;
       if (first) {
-        // Åbn ved den første kommende booking, hvis måneden er tom
-        const todayI = indexOf(now);
-        const inMonth = d.bookings.some(b => { const s = dateOf(b.start_day); return s.getFullYear() === view.y && s.getMonth() === view.m; });
+        // Åbn ved den første kommende booking, hvis perioden er tom
+        const n = periodLen(start, zoom), todayI = indexOf(now);
+        const inView = d.bookings.some(b => b.start_day < start + n && b.start_day + Math.max(1, b.duration) > start);
         const next = d.bookings.find(b => b.start_day + b.duration > todayI);
-        if (!inMonth && next) { const s = dateOf(next.start_day); view = { y: s.getFullYear(), m: s.getMonth() }; }
+        if (!inView && next) start = periodStart(dateOf(next.start_day), zoom);
       }
       render();
     } catch (e) {
@@ -151,6 +173,13 @@
   };
 
   const barText = b => `${esc(b.label || '')}${b.episode ? `<span class="ep">${esc(b.episode)}</span>` : ''}${b.work_type ? `<span class="ep">· ${esc(b.work_type)}</span>` : ''}`;
+  const locale = lang === 'da' ? 'da-DK' : 'en-GB';
+  const periodLabel = (i0, n) => {
+    const a = dateOf(i0), z = dateOf(i0 + n - 1);
+    if (months(zoom) === 1) return `${T.months[a.getMonth()]} ${a.getFullYear()}`;
+    if (months(zoom)) return `${T.months[a.getMonth()].slice(0, 3)}${a.getFullYear() !== z.getFullYear() ? ' ' + a.getFullYear() : ''} – ${T.months[z.getMonth()].slice(0, 3)} ${z.getFullYear()}`;
+    return `${a.toLocaleDateString(locale, { day: 'numeric', month: 'short' })} – ${z.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  };
 
   const render = () => {
     $('loading').hidden = true; $('invalid').hidden = true; $('view').hidden = false;
@@ -158,19 +187,34 @@
     $('org').textContent = data.organization || '';
     $('folder').textContent = data.folder;
     $('project').textContent = data.project && data.project !== data.folder ? T.project(data.project) : '';
-    $('month').textContent = `${T.months[view.m]} ${view.y}`;
     $('today').textContent = T.today;
+    $('zooms').innerHTML = ZOOMS.map(z => `<button data-z="${z.id}" class="${z.id === zoom ? 'on' : ''}">${z.label}</button>`).join('');
 
-    const first = new Date(view.y, view.m, 1), last = new Date(view.y, view.m + 1, 0);
-    const i0 = indexOf(first), n = last.getDate(), todayI = indexOf(now);
+    const i0 = start, n = periodLen(start, zoom), todayI = indexOf(now);
+    $('month').textContent = periodLabel(i0, n);
+    const sc = document.querySelector('.scroller');
+    const DW = Math.max(4, (sc.clientWidth - LABEL_W() - 1) / n);
+    const mode = DW >= 26 ? 'full' : DW >= 16 ? 'num' : 'tiny';
     const rowColor = Object.fromEntries(data.rows.map(r => [r.id, r.color]));
     const visible = data.bookings.filter(b => b.start_day <= i0 + n - 1 && b.start_day + Math.max(1, b.duration) - 1 >= i0);
+    const dayCells = h => { let d = ''; for (let k = 0; k < n; k++) { const wd = (dateOf(i0 + k).getDay() + 6) % 7; d += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 0 ? ' mon' : ''}" style="height:${h}px"></div>`; } return d; };
 
-    // Dagkolonnerne
+    // Måneder over dagene, når perioden går over flere måneder (eller er kort)
+    let monthRow = '';
+    if (months(zoom) !== 1) {
+      let k = 0, segs = '';
+      while (k < n) {
+        const d = dateOf(i0 + k), next = indexOf(new Date(d.getFullYear(), d.getMonth() + 1, 1)) - i0, len = Math.min(n, next) - k;
+        segs += `<div class="mseg" style="width:${len * DW}px">${len * DW > 50 ? esc(`${T.months[d.getMonth()]} ${d.getFullYear()}`) : ''}</div>`;
+        k += len;
+      }
+      monthRow = `<div class="head months"><div class="label"></div><div class="days">${segs}</div></div>`;
+    }
     let head = `<div class="head"><div class="label"></div><div class="days">`;
     for (let k = 0; k < n; k++) {
       const d = dateOf(i0 + k), wd = (d.getDay() + 6) % 7;
-      head += `<div class="day${wd >= 5 ? ' we' : ''}${i0 + k === todayI ? ' today' : ''}">${T.wd[wd]}<b>${d.getDate()}</b></div>`;
+      const txt = mode === 'full' ? `${T.wd[wd]}<b>${d.getDate()}</b>` : mode === 'num' ? `<b>${d.getDate()}</b>` : (wd === 0 ? `<b class="mtiny">${d.getDate()}</b>` : '');
+      head += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 0 ? ' mon' : ''}${i0 + k === todayI ? ' today' : ''}">${txt}</div>`;
     }
     head += `</div></div>`;
 
@@ -187,34 +231,36 @@
       const lanes = [];
       for (const x of list) { let l = lanes.findIndex(end => end <= x.s + 1e-6); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = x.e; x.lane = l; }
       const h = Math.max(1, lanes.length) * 28 + 8;
-      let days = '';
-      for (let k = 0; k < n; k++) { const wd = (dateOf(i0 + k).getDay() + 6) % 7; days += `<div class="day${wd >= 5 ? ' we' : ''}" style="height:${h}px"></div>`; }
       const bars = list.map(x => {
         const color = x.b.color || rowColor[x.b.row_id] || '#888888';
-        const left = (x.s - i0) * DW + 2, width = Math.max(14, (x.e - x.s) * DW - 4);
-        return `<div class="bar" style="left:${left}px;width:${width}px;top:${6 + x.lane * 28}px;background:${esc(color)}" title="${esc(x.b.label || '')}">${barText(x.b)}</div>`;
+        const left = (x.s - i0) * DW + 1, width = Math.max(4, (x.e - x.s) * DW - 2);
+        return `<div class="bar" style="left:${left}px;width:${width}px;top:${6 + x.lane * 28}px;background:${esc(color)};${width < 26 ? 'padding:0' : ''}" title="${esc([x.b.label, x.b.episode, x.b.work_type].filter(Boolean).join(' · '))}">${width >= 26 ? barText(x.b) : ''}</div>`;
       }).join('');
       const line = todayI >= i0 && todayI < i0 + n ? `<div class="todayLine" style="left:${(todayI - i0 + (now.getHours() * 60 + now.getMinutes()) / 1440) * DW}px"></div>` : '';
-      rows += `<div class="row"><div class="label"><span class="dot${r.category === 'studio' ? ' studio' : ''}" style="background:${esc(r.color || '#888')}"></span><span>${esc(r.label)}</span></div><div class="days">${days}${bars}${line}</div></div>`;
+      rows += `<div class="row"><div class="label"><span class="dot${r.category === 'studio' ? ' studio' : ''}" style="background:${esc(r.color || '#888')}"></span><span>${esc(r.label)}</span></div><div class="days">${dayCells(h)}${bars}${line}</div></div>`;
     }
-    // Luft over første og under sidste række (Nicolai) — samme dagkolonner, så gitter og weekender fortsætter
-    const pad = () => { let d = ''; for (let k = 0; k < n; k++) { const wd = (dateOf(i0 + k).getDay() + 6) % 7; d += `<div class="day${wd >= 5 ? ' we' : ''}" style="height:12px"></div>`; } return `<div class="row pad"><div class="label"></div><div class="days">${d}</div></div>`; };
-    if (data.rows.length) rows = pad() + rows + pad();
+    // En tom række under den sidste (Nicolai), samme højde som en række med én bjælke
+    if (data.rows.length) rows += `<div class="row"><div class="label"></div><div class="days">${dayCells(36)}</div></div>`;
     const grid = $('grid');
     grid.style.setProperty('--dw', DW + 'px');
-    grid.innerHTML = head + (data.rows.length ? rows : `<div class="empty">${T.none}</div>`);
+    grid.className = `grid ${mode}`;
+    grid.innerHTML = monthRow + head + (data.rows.length ? rows : `<div class="empty">${T.none}</div>`);
 
-    $('foot').textContent = [T.readOnly, data.expires_at ? T.expires(new Date(data.expires_at).toLocaleDateString(lang === 'da' ? 'da-DK' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })) : ''].filter(Boolean).join(' ');
-
-    // Rul tidslinjen hen til i dag, når den er i måneden
-    const sc = document.querySelector('.scroller');
-    if (!sc.dataset.scrolled) { sc.dataset.scrolled = '1'; sc.scrollLeft = todayI >= i0 && todayI < i0 + n ? Math.max(0, (todayI - i0 - 3) * DW) : 0; }
+    $('foot').textContent = [T.readOnly, data.expires_at ? T.expires(new Date(data.expires_at).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })) : ''].filter(Boolean).join(' ');
   };
 
-  const shift = d => { view = { y: view.m + d < 0 ? view.y - 1 : view.m + d > 11 ? view.y + 1 : view.y, m: (view.m + d + 12) % 12 }; document.querySelector('.scroller').dataset.scrolled = ''; render(); };
-  $('prev').onclick = () => shift(-1);
-  $('next').onclick = () => shift(1);
-  $('today').onclick = () => { view = { y: now.getFullYear(), m: now.getMonth() }; document.querySelector('.scroller').dataset.scrolled = ''; render(); };
+  $('prev').onclick = () => { start = shiftStart(start, zoom, -1); render(); };
+  $('next').onclick = () => { start = shiftStart(start, zoom, 1); render(); };
+  $('today').onclick = () => { start = periodStart(now, zoom); render(); };
+  $('zooms').onclick = e => {
+    const z = e.target.closest('button')?.dataset.z;
+    if (!z || z === zoom) return;
+    // Bliv omkring det sted, man kigger på (i dag, hvis det er i perioden)
+    const n = periodLen(start, zoom), todayI = indexOf(now);
+    const anchor = todayI >= start && todayI < start + n ? now : dateOf(start);
+    zoom = z; lsSet('projektZoom', z); start = periodStart(anchor, zoom); render();
+  };
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => data && render(), 120); });
 
   load();
   setInterval(load, 60000);
