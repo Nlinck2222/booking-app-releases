@@ -195,7 +195,8 @@
     if (b.type === 'Ferie' || b.type === 'Fri') return [b.label].filter(Boolean);
     const lead = b.type === 'Møde' || b.type === 'Visning' ? b.type : '';
     const name = b.show_name !== false ? b.label : '';
-    const ep = b.show_project !== false && b.episode ? [data.project, b.episode].filter(Boolean).join(' · ') : '';
+    // Samlet projekt (v849): delen har intet navn, så kun projektet står der — som i appen
+    const ep = b.show_project !== false && b.episode_id ? [data.project, b.episode].filter(Boolean).join(' · ') : '';
     const person = b.show_initials ? (initialsOf(b.row_id) ?? (b.linked_row_id ? initialsOf(b.linked_row_id) : '')) : '';
     const wt = b.show_work_type !== false && b.work_type ? b.work_type : '';
     return [lead, name, ep, person, wt].filter(Boolean);
