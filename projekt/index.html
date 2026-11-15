@@ -25,6 +25,8 @@
           /* Weekender og ferier/helligdage som appen (theme.ts saturday/sundayBg, -HeaderBg, holidayBg/-Border/-Red) */
           --satBg: rgba(77, 67, 35, 0.045); --sunBg: rgba(77, 67, 35, 0.035); --satHead: rgba(77, 67, 35, 0.10); --sunHead: rgba(77, 67, 35, 0.08);
           --holBg: rgba(208, 24, 0, 0.21); --holBorder: rgba(208, 24, 0, 0.39); --holRed: rgb(179, 21, 0);
+          /* Stregerne mellem rækkerne som appens rowLine (2026-11-15) */
+          --rowLine: rgba(226, 221, 208, 0.42);
           /* Nu-linjen som i appen (theme.ts playheadLineTimeline/-Glow): blå i lyst tema, lys gul i mørkt (2026-11-15);
              også dagens dato og i dag-stregen i scrubberen */
           --now: #0077ff; --nowGlow: rgba(0, 0, 0, 0.3); }
@@ -38,7 +40,7 @@
             --tabShadow: 0 0 12px 1px rgba(0, 0, 0, 0.36);
             --hourLine: rgba(255, 255, 255, 0.03); --hourLineHead: rgba(255, 255, 255, 0.05);
             --satBg: rgba(122, 166, 224, 0.035); --sunBg: rgba(122, 166, 224, 0.025); --satHead: rgba(122, 166, 224, 0.10); --sunHead: rgba(122, 166, 224, 0.08);
-            --holBg: rgba(255, 75, 75, 0.08); --holBorder: rgba(255, 75, 75, 0.31); --holRed: #FF4B4B; --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
+            --holBg: rgba(255, 75, 75, 0.08); --holBorder: rgba(255, 75, 75, 0.31); --holRed: #FF4B4B; --rowLine: rgba(0, 0, 0, 0.4); --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
   }
   :root[data-theme="dark"] { --bg: #373636; --card: #242323; --label: #373636; --head: #373636; --dayHead: #282727; --text: #e0e0e0; --muted: #818181;
             --line: rgba(35, 32, 32, 0.75); --grid: rgba(255, 255, 255, 0.05); --weekendLine: rgba(122, 166, 224, 0.4); --btnBorder: rgba(255, 255, 255, 0.05);
@@ -47,7 +49,7 @@
             --tabShadow: 0 0 12px 1px rgba(0, 0, 0, 0.36);
             --hourLine: rgba(255, 255, 255, 0.03); --hourLineHead: rgba(255, 255, 255, 0.05);
             --satBg: rgba(122, 166, 224, 0.035); --sunBg: rgba(122, 166, 224, 0.025); --satHead: rgba(122, 166, 224, 0.10); --sunHead: rgba(122, 166, 224, 0.08);
-            --holBg: rgba(255, 75, 75, 0.08); --holBorder: rgba(255, 75, 75, 0.31); --holRed: #FF4B4B; --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
+            --holBg: rgba(255, 75, 75, 0.08); --holBorder: rgba(255, 75, 75, 0.31); --holRed: #FF4B4B; --rowLine: rgba(0, 0, 0, 0.4); --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
   /* Bredden følger vinduet (2026-11-15, Nicolai): passer på den mindste MacBook (1280 punkter), vokser på større skærme */
@@ -77,6 +79,7 @@
   .head, .row { display: flex; border-bottom: 1px solid var(--line); }
   .head { background: var(--head); }
   .head:not(.months):not(.weeks) { background: var(--dayHead); }
+  .row { border-bottom-color: var(--rowLine); }
   .row:last-child { border-bottom: none; }
   .label { position: sticky; left: 0; z-index: 3; flex: 0 0 150px; width: 150px; padding: 8px 12px; background: var(--label); border-right: 1px solid var(--line);
            display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; overflow: hidden; }
