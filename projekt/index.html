@@ -14,19 +14,24 @@
   Kun tidslinjen (Nicolai: listen under behøves ikke) + zoom og scrubber. Henter igen hvert minut og når fanen får fokus. Dag-indeks fra mandag 30. dec 2024, som i appen.
 -->
 <style>
-  :root { --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; --muted: #6e6e73; --line: #e3e3e6; --grid: #eeeef0; --weekend: #f7f7f9;
-          --barText: #ffffff; --btn: #f0f0f2;
+  /* Tonerne som i appen (2026-11-15, src/theme.ts): --bg/--label = sidebarBg, --card = gridBg, --head = headerBg,
+     --dayHead = timelineDayBg, --line = sidebarLine, --grid = gridLine, --weekendLine = weekendBorderColor, --btn = btnNormalBg */
+  :root { --bg: #dfdfde; --card: #c5c5c4; --label: #dfdfde; --head: #dfdfde; --dayHead: #c8c8c7; --text: #3c3728; --muted: #89867e;
+          --line: rgba(0, 0, 0, 0.2); --grid: rgba(0, 0, 0, 0.1); --weekendLine: rgba(77, 67, 35, 0.2); --btnBorder: rgba(0, 0, 0, 0.15);
+          --barText: #ffffff; --btn: #ffffff;
           /* Nu-linjen som i appen (theme.ts playheadLineTimeline/-Glow): blå i lyst tema, lys gul i mørkt (2026-11-15);
              også dagens dato og i dag-stregen i scrubberen */
           --now: #0077ff; --nowGlow: rgba(0, 0, 0, 0.3); }
   /* Tema (2026-11-15, Nicolai): følger computeren, indtil man vælger med knappen øverst; valget huskes i browseren */
   :root { color-scheme: light; }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --bg: #111113; --card: #1c1c1f; --text: #f5f5f7; --muted: #a1a1a6; --line: #2c2c30; --grid: #26262a; --weekend: #202024;
-            --barText: #ffffff; --btn: #2a2a2e; --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
+    :root:not([data-theme="light"]) { --bg: #373636; --card: #242323; --label: #373636; --head: #373636; --dayHead: #282727; --text: #e0e0e0; --muted: #818181;
+            --line: rgba(35, 32, 32, 0.75); --grid: rgba(255, 255, 255, 0.05); --weekendLine: rgba(122, 166, 224, 0.4); --btnBorder: rgba(255, 255, 255, 0.05);
+            --barText: #ffffff; --btn: #282828; --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
   }
-  :root[data-theme="dark"] { --bg: #111113; --card: #1c1c1f; --text: #f5f5f7; --muted: #a1a1a6; --line: #2c2c30; --grid: #26262a; --weekend: #202024;
-            --barText: #ffffff; --btn: #2a2a2e; --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
+  :root[data-theme="dark"] { --bg: #373636; --card: #242323; --label: #373636; --head: #373636; --dayHead: #282727; --text: #e0e0e0; --muted: #818181;
+            --line: rgba(35, 32, 32, 0.75); --grid: rgba(255, 255, 255, 0.05); --weekendLine: rgba(122, 166, 224, 0.4); --btnBorder: rgba(255, 255, 255, 0.05);
+            --barText: #ffffff; --btn: #282828; --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
   /* Bredden følger vinduet (2026-11-15, Nicolai): passer på den mindste MacBook (1280 punkter), vokser på større skærme */
@@ -38,11 +43,11 @@
   h1 { font-size: 22px; margin: 0; line-height: 1.25; }
   .sub { font-size: 13px; color: var(--muted); margin: 2px 0 0; }
   .nav { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-  .nav button { border: 1px solid var(--line); background: var(--btn); color: var(--text); border-radius: 6px; height: 30px; min-width: 30px; padding: 0 10px; font: inherit; font-weight: 600; cursor: pointer; }
+  .nav button { border: 1px solid var(--btnBorder); background: var(--btn); color: var(--text); border-radius: 6px; height: 30px; min-width: 30px; padding: 0 10px; font: inherit; font-weight: 600; cursor: pointer; }
   .nav .month { min-width: 150px; text-align: center; font-weight: 700; white-space: nowrap; }
-  .zooms { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-right: 8px; }
+  .zooms { display: flex; border: 1px solid var(--btnBorder); border-radius: 6px; overflow: hidden; margin-right: 8px; }
   .nav .zooms button { border: none; border-radius: 0; background: transparent; height: 28px; min-width: 36px; padding: 0 8px; font-size: 12px; color: var(--muted); }
-  .nav .zooms button + button { border-left: 1px solid var(--line); }
+  .nav .zooms button + button { border-left: 1px solid var(--btnBorder); }
   .nav .zooms button.on { background: var(--btn); color: var(--text); }
   /* Måneds- og ugerækken (2026-11-15, Nicolai): som i appen — "NOV 26" og kun ugenummeret, venstrestillet */
   .months .mseg, .weeks .mseg { flex: none; font-size: 10px; font-weight: 600; letter-spacing: .06em; color: var(--muted); padding: 5px 6px;
@@ -53,15 +58,18 @@
   .scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; background: var(--card); border-radius: 12px; }
   .grid { position: relative; min-width: max-content; }
   .head, .row { display: flex; border-bottom: 1px solid var(--line); }
+  .head { background: var(--head); }
+  .head:not(.months):not(.weeks) { background: var(--dayHead); }
   .row:last-child { border-bottom: none; }
-  .label { position: sticky; left: 0; z-index: 3; flex: 0 0 150px; width: 150px; padding: 8px 12px; background: var(--card); border-right: 1px solid var(--line);
+  .label { position: sticky; left: 0; z-index: 3; flex: 0 0 150px; width: 150px; padding: 8px 12px; background: var(--label); border-right: 1px solid var(--line);
            display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; overflow: hidden; }
   .label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dot { flex: 0 0 9px; width: 9px; height: 9px; border-radius: 50%; }
   .dot.studio { border-radius: 2px; }
   .days { position: relative; display: flex; }
   .day { flex: 0 0 var(--dw); width: var(--dw); border-right: 1px solid var(--grid); }
-  .day.we { background: var(--weekend); }
+  /* Weekenden som i appen: ingen baggrund, en streg efter fredag og søndag (getDayStyle) */
+  .day.fri, .day.sun { border-right-color: var(--weekendLine); }
   .head .day { text-align: center; font-size: 11px; color: var(--muted); padding: 6px 0; line-height: 1.2; }
   .head .day b { display: block; font-size: 12px; color: var(--text); }
   .head .day.today b { color: var(--now); }
@@ -72,7 +80,7 @@
   .bar .ep { opacity: .85; font-weight: 500; margin-left: 5px; }
   .empty { padding: 24px; color: var(--muted); }
   .scrub { margin-top: 12px; padding: 0 2px; touch-action: none; user-select: none; -webkit-user-select: none; }
-  .strack { position: relative; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); cursor: pointer; overflow: hidden; }
+  .strack { position: relative; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--head); cursor: pointer; overflow: hidden; }
   .tick { position: absolute; top: 18px; height: 8px; border-radius: 2px; opacity: .85; }
   .smark { position: absolute; top: 3px; font-size: 10px; color: var(--muted); padding-left: 4px; border-left: 1px solid var(--line); height: 100%; white-space: nowrap; pointer-events: none; }
   .stoday { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--now); box-shadow: 0 0 2px var(--nowGlow); pointer-events: none; }
@@ -284,7 +292,7 @@
     const mode = DW >= 26 ? 'full' : DW >= 16 ? 'num' : 'tiny';
     const rowColor = Object.fromEntries(data.rows.map(r => [r.id, r.color]));
     const visible = data.bookings.filter(b => b.start_day <= i0 + n - 1 && b.start_day + Math.max(1, b.duration) - 1 >= i0);
-    const dayCells = h => { let d = ''; for (let k = 0; k < n; k++) { const wd = (dateOf(i0 + k).getDay() + 6) % 7; d += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 0 ? ' mon' : ''}" style="height:${h}px"></div>`; } return d; };
+    const dayCells = h => { let d = ''; for (let k = 0; k < n; k++) { const wd = (dateOf(i0 + k).getDay() + 6) % 7; d += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 4 ? ' fri' : wd === 6 ? ' sun' : ''}${wd === 0 ? ' mon' : ''}" style="height:${h}px"></div>`; } return d; };
 
     // Tre rækker som i appen (Nicolai 2026-11-15): måneder ("NOV 26"), ugenumre og dagens tal. Ved 3 og 6 måneder er
     // dagsrækken tom. Et stykke tekst vises kun, når der er plads til det
@@ -304,7 +312,7 @@
     let head = `<div class="head"><div class="label"></div><div class="days">`;
     for (let k = 0; k < n; k++) {
       const d = dateOf(i0 + k), wd = (d.getDay() + 6) % 7;
-      head += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 0 ? ' mon' : ''}${i0 + k === todayI ? ' today' : ''}">${showDays ? `<b>${d.getDate()}</b>` : '&nbsp;'}</div>`;
+      head += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 4 ? ' fri' : wd === 6 ? ' sun' : ''}${wd === 0 ? ' mon' : ''}${i0 + k === todayI ? ' today' : ''}">${showDays ? `<b>${d.getDate()}</b>` : '&nbsp;'}</div>`;
     }
     head += `</div></div>`;
 
