@@ -89,8 +89,8 @@
   .head .day b { display: block; font-size: 12px; color: var(--text); }
   .head .day.today b { color: var(--now); }
   .todayLine { position: absolute; top: 0; bottom: 0; width: 1px; transform: translateX(-50%); background: var(--now); box-shadow: 0 0 2px var(--nowGlow); z-index: 2; pointer-events: none; }
-  /* Bjælkehøjden (2026-11-15, Nicolai): højere end før (24), lidt lavere end appens ~38 */
-  .bar { position: absolute; height: 32px; border-radius: 4px; color: var(--barText); font-size: 11px; font-weight: 600; padding: 0 7px;
+  /* Bjælkehøjden (2026-11-15, Nicolai): 34 px (før 24), lidt lavere end appens ~38; rækkerne uændret 44 px */
+  .bar { position: absolute; height: 34px; border-radius: 4px; color: var(--barText); font-size: 11px; font-weight: 600; padding: 0 7px;
          display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 1;
          box-shadow: inset 0 -1px 0 rgba(0,0,0,.15); text-shadow: 0 1px 1px rgba(0,0,0,.25); }
   .bar .ep { opacity: .85; font-weight: 500; margin-left: 5px; }
@@ -183,16 +183,18 @@
   $('theme').onclick = () => { const t = darkNow() ? 'light' : 'dark'; document.documentElement.dataset.theme = t; lsSet('projektTheme', t); paintThemeBtn(); };
   let zoom = ZOOMS.some(z => z.id === lsGet('projektZoom')) ? lsGet('projektZoom') : '1m';
   const months = z => ({ '1m': 1, '3m': 3, '6m': 6 }[z] || 0);
-  // Periodens start (dag-indeks) for en dato: mandagen i ugen eller den 1. i måneden
   const days = z => ({ '1d': 1, '7d': 7, '14d': 14 }[z]);
-  const periodStart = (d, z) => months(z) ? indexOf(new Date(d.getFullYear(), d.getMonth(), 1)) : z === '1d' ? indexOf(d) : indexOf(d) - ((d.getDay() + 6) % 7);
-  // Efter scrubberen kan perioden starte midt i en måned — så bruges samme dato i måneden
+  // Placering som i appen (2026-11-15; App.tsx ved opstart, N/I dag og executeZoom): i 1D står dagens start helt til
+  // venstre, ellers står dagen midt i vinduet. Perioden kan derfor starte på en hvilken som helst dag
+  const approxLen = z => months(z) ? Math.round(months(z) * 30.44) : days(z);
+  const centerOn = (day, z) => z === '1d' ? Math.floor(day) : Math.round(day - approxLen(z) / 2);
+  // 1M/3M/6M: perioden løber til samme dato 1, 3 eller 6 måneder senere
   const periodLen = (i0, z) => { if (!months(z)) return days(z); const d = dateOf(i0); return indexOf(new Date(d.getFullYear(), d.getMonth() + months(z), d.getDate())) - i0; };
   const shiftStart = (i0, z, dir) => { if (!months(z)) return i0 + dir * days(z); const d = dateOf(i0); return indexOf(new Date(d.getFullYear(), d.getMonth() + dir * months(z), d.getDate())); };
 
   let data = null;
   const now = new Date();
-  let start = periodStart(now, zoom);
+  let start = centerOn(indexOf(now), zoom);
 
   const showInvalid = () => {
     $('loading').hidden = true; $('view').hidden = true; $('invalid').hidden = false;
@@ -215,7 +217,7 @@
         const n = periodLen(start, zoom), todayI = indexOf(now);
         const inView = d.bookings.some(b => b.start_day < start + n && b.start_day + Math.max(1, b.duration) > start);
         const next = d.bookings.find(b => b.start_day + b.duration > todayI);
-        if (!inView && next) start = periodStart(dateOf(next.start_day), zoom);
+        if (!inView && next) start = centerOn(next.start_day, zoom);
       }
       render();
     } catch (e) {
@@ -253,7 +255,7 @@
     const aligned = a.getDate() === 1;
     if (aligned && months(zoom) === 1) return `${T.months[a.getMonth()]} ${a.getFullYear()}`;
     if (aligned && months(zoom)) return `${T.months[a.getMonth()].slice(0, 3)}${a.getFullYear() !== z.getFullYear() ? ' ' + a.getFullYear() : ''} – ${T.months[z.getMonth()].slice(0, 3)} ${z.getFullYear()}`;
-    return `${a.toLocaleDateString(locale, { day: 'numeric', month: 'short' })} – ${z.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    return `${a.toLocaleDateString(locale, { day: 'numeric', month: 'short', ...(a.getFullYear() !== z.getFullYear() ? { year: 'numeric' } : {}) })} – ${z.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}`;
   };
 
   // Scrubber (Nicolai: "en scrubber i bunden"): hele projektets forløb med en streg pr. booking og et vindue for det
@@ -349,12 +351,12 @@
       // Spor, så overlappende bookinger ligger under hinanden
       const lanes = [];
       for (const x of list) { let l = lanes.findIndex(end => end <= x.s + 1e-6); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = x.e; x.lane = l; }
-      const LANE = 36;   // 32 px bjælke + 4 px luft
+      const LANE = 36;   // 34 px bjælke + 2 px luft
       const h = Math.max(1, lanes.length) * LANE + 8;
       const bars = list.map(x => {
         const color = x.b.color || rowColor[x.b.row_id] || '#888888';
         const left = (x.s - i0) * DW + 1, width = Math.max(4, (x.e - x.s) * DW - 2);
-        return `<div class="bar" style="left:${left}px;width:${width}px;top:${6 + x.lane * LANE}px;background:${esc(color)};${width < 26 ? 'padding:0' : ''}" title="${esc(barParts(x.b).join(' · '))}">${width >= 26 ? barText(x.b) : ''}</div>`;
+        return `<div class="bar" style="left:${left}px;width:${width}px;top:${5 + x.lane * LANE}px;background:${esc(color)};${width < 26 ? 'padding:0' : ''}" title="${esc(barParts(x.b).join(' · '))}">${width >= 26 ? barText(x.b) : ''}</div>`;
       }).join('');
       const line = todayI >= i0 && todayI < i0 + n ? `<div class="todayLine" style="left:${(todayI - i0 + (now.getHours() * 60 + now.getMinutes()) / 1440) * DW}px"></div>` : '';
       rows += `<div class="row"><div class="label"><span class="dot${r.category === 'studio' ? ' studio' : ''}" style="background:${esc(r.color || '#888')}"></span><span>${esc(r.label)}</span></div><div class="days">${dayCells(h)}${bars}${line}</div></div>`;
@@ -376,14 +378,13 @@
 
   $('prev').onclick = () => { start = shiftStart(start, zoom, -1); render(); };
   $('next').onclick = () => { start = shiftStart(start, zoom, 1); render(); };
-  $('today').onclick = () => { start = periodStart(now, zoom); render(); };
+  $('today').onclick = () => { start = centerOn(indexOf(now), zoom); render(); };
   $('zooms').onclick = e => {
     const z = e.target.closest('button')?.dataset.z;
     if (!z || z === zoom) return;
-    // Bliv omkring det sted, man kigger på (i dag, hvis det er i perioden)
-    const n = periodLen(start, zoom), todayI = indexOf(now);
-    const anchor = todayI >= start && todayI < start + n ? now : dateOf(start);
-    zoom = z; lsSet('projektZoom', z); start = periodStart(anchor, zoom); render();
+    // Som appens executeZoom: midten bliver i midten; fra 1D er det den viste dag, til 1D dagen i midten
+    const center = zoom === '1d' ? start : start + periodLen(start, zoom) / 2;
+    zoom = z; lsSet('projektZoom', z); start = centerOn(center, zoom); render();
   };
   let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => data && render(), 120); });
 
