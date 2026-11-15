@@ -184,13 +184,21 @@
 
   // Bjælketeksten som i appen (bookingBarText i src/uiParts.tsx): øjnene i booking-fanen styrer navn, projekt og arbejdstype;
   // Ferie/Fri kun navnet; Møde/Visning med typen forrest. Rækkefølgen er appens standard (den valgte gemmes kun lokalt i appen)
+  // Initialer (migration 073): personrækkens initialer, når øjet ved Tildel er tændt; ikke sat → ud fra navnet (rowInitials)
+  const rowInitials = label => {
+    const words = (label || '').split(/[\s-]+/).filter(Boolean);
+    if (words.length === 1 && !/^\d+$/.test(words[0])) return words[0].slice(0, 2).toUpperCase();
+    return words.slice(0, 3).map(w => /^\d+$/.test(w) ? w : w[0].toUpperCase()).join('');
+  };
+  const initialsOf = id => { const r = data.rows.find(x => x.id === id && x.category === 'person'); return r ? ((r.initials || '').toUpperCase() || rowInitials(r.label)) : undefined; };
   const barParts = b => {
     if (b.type === 'Ferie' || b.type === 'Fri') return [b.label].filter(Boolean);
     const lead = b.type === 'Møde' || b.type === 'Visning' ? b.type : '';
     const name = b.show_name !== false ? b.label : '';
     const ep = b.show_project !== false && b.episode ? [data.project, b.episode].filter(Boolean).join(' · ') : '';
+    const person = b.show_initials ? (initialsOf(b.row_id) ?? (b.linked_row_id ? initialsOf(b.linked_row_id) : '')) : '';
     const wt = b.show_work_type !== false && b.work_type ? b.work_type : '';
-    return [lead, name, ep, wt].filter(Boolean);
+    return [lead, name, ep, person, wt].filter(Boolean);
   };
   const barText = b => barParts(b).map((p, i) => i ? `<span class="ep">· ${esc(p)}</span>` : esc(p)).join('');
   // Ugenummer (ISO), som getWeekNumber i appen
