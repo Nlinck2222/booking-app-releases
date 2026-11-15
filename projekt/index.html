@@ -35,10 +35,11 @@
   .nav .zooms button { border: none; border-radius: 0; background: transparent; height: 28px; min-width: 36px; padding: 0 8px; font-size: 12px; color: var(--muted); }
   .nav .zooms button + button { border-left: 1px solid var(--line); }
   .nav .zooms button.on { background: var(--btn); color: var(--text); }
-  .months .mseg { flex: none; font-size: 11px; font-weight: 700; padding: 5px 8px; border-right: 1px solid var(--grid); white-space: nowrap; overflow: hidden; }
+  /* Måneds- og ugerækken (2026-11-15, Nicolai): som i appen — "NOV 26" og kun ugenummeret, venstrestillet */
+  .months .mseg, .weeks .mseg { flex: none; font-size: 10px; font-weight: 600; letter-spacing: .06em; color: var(--muted); padding: 5px 6px;
+         border-right: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
   .grid.tiny .day { border-right-color: transparent; }
   .grid.tiny .day.mon { box-shadow: inset 1px 0 0 var(--grid); }
-  .mtiny { position: relative; z-index: 1; font-size: 10px; text-align: left; padding-left: 2px; white-space: nowrap; }
   .head .day { position: relative; }
   :root { color-scheme: light dark; }
   .scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; background: var(--card); border-radius: 12px; }
@@ -120,12 +121,12 @@
           today: 'I dag', none: 'Ingen bookinger.', project: p => `Projekt: ${p}`,
           expires: d => `Linket udløber ${d}.`, readOnly: 'Kun visning. Siden opdaterer sig selv.', 
           months: ['Januar','Februar','Marts','April','Maj','Juni','Juli','August','September','Oktober','November','December'],
-          wd: ['Ma','Ti','On','To','Fr','Lø','Sø'] },
+          mShort: ['JAN','FEB','MAR','APR','MAJ','JUN','JUL','AUG','SEP','OKT','NOV','DEC'] },
     en: { invalidTitle: 'This link no longer works', invalidText: 'It may have been stopped or expired. Contact the person who shared it with you.',
           today: 'Today', none: 'No bookings.', project: p => `Project: ${p}`,
           expires: d => `The link expires ${d}.`, readOnly: 'View only. The page updates itself.', 
           months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
-          wd: ['Mo','Tu','We','Th','Fr','Sa','Su'] },
+          mShort: ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'] },
   }[lang];
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -181,7 +182,20 @@
     }
   };
 
-  const barText = b => `${esc(b.label || '')}${b.episode ? `<span class="ep">${esc(b.episode)}</span>` : ''}${b.work_type ? `<span class="ep">· ${esc(b.work_type)}</span>` : ''}`;
+  // Bjælketeksten som i appen (bookingBarText i src/uiParts.tsx): øjnene i booking-fanen styrer navn, projekt og arbejdstype;
+  // Ferie/Fri kun navnet; Møde/Visning med typen forrest. Rækkefølgen er appens standard (den valgte gemmes kun lokalt i appen)
+  const barParts = b => {
+    if (b.type === 'Ferie' || b.type === 'Fri') return [b.label].filter(Boolean);
+    const lead = b.type === 'Møde' || b.type === 'Visning' ? b.type : '';
+    const name = b.show_name !== false ? b.label : '';
+    const ep = b.show_project !== false && b.episode ? [data.project, b.episode].filter(Boolean).join(' · ') : '';
+    const wt = b.show_work_type !== false && b.work_type ? b.work_type : '';
+    return [lead, name, ep, wt].filter(Boolean);
+  };
+  const barText = b => barParts(b).map((p, i) => i ? `<span class="ep">· ${esc(p)}</span>` : esc(p)).join('');
+  // Ugenummer (ISO), som getWeekNumber i appen
+  const isoWeek = d => { const t = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7) + 3); const y = new Date(t.getFullYear(), 0, 4);
+    return 1 + Math.round(((t - y) / 86400000 - 3 + ((y.getDay() + 6) % 7)) / 7); };
   const locale = lang === 'da' ? 'da-DK' : 'en-GB';
   const periodLabel = (i0, n) => {
     const a = dateOf(i0), z = dateOf(i0 + n - 1);
@@ -247,22 +261,25 @@
     const visible = data.bookings.filter(b => b.start_day <= i0 + n - 1 && b.start_day + Math.max(1, b.duration) - 1 >= i0);
     const dayCells = h => { let d = ''; for (let k = 0; k < n; k++) { const wd = (dateOf(i0 + k).getDay() + 6) % 7; d += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 0 ? ' mon' : ''}" style="height:${h}px"></div>`; } return d; };
 
-    // Måneder over dagene, når perioden går over flere måneder (eller er kort)
-    let monthRow = '';
-    if (months(zoom) !== 1) {
+    // Tre rækker som i appen (Nicolai 2026-11-15): måneder ("NOV 26"), ugenumre og dagens tal. Ved 3 og 6 måneder er
+    // dagsrækken tom. Et stykke tekst vises kun, når der er plads til det
+    const segRow = (cls, startOf, text) => {
       let k = 0, segs = '';
       while (k < n) {
-        const d = dateOf(i0 + k), next = indexOf(new Date(d.getFullYear(), d.getMonth() + 1, 1)) - i0, len = Math.min(n, next) - k;
-        segs += `<div class="mseg" style="width:${len * DW}px">${len * DW > 50 ? esc(`${T.months[d.getMonth()]} ${d.getFullYear()}`) : ''}</div>`;
+        const len = Math.min(n, startOf(k)) - k;
+        segs += `<div class="mseg" style="width:${len * DW}px">${len * DW > 22 ? esc(text(dateOf(i0 + k))) : ''}</div>`;
         k += len;
       }
-      monthRow = `<div class="head months"><div class="label"></div><div class="days">${segs}</div></div>`;
-    }
+      return `<div class="head ${cls}"><div class="label"></div><div class="days">${segs}</div></div>`;
+    };
+    const monthRow = segRow('months', k => { const d = dateOf(i0 + k); return indexOf(new Date(d.getFullYear(), d.getMonth() + 1, 1)) - i0; },
+      d => `${T.mShort[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`);
+    const weekRow = segRow('weeks', k => k + 7 - ((dateOf(i0 + k).getDay() + 6) % 7), d => String(isoWeek(d)));
+    const showDays = months(zoom) < 3 && mode !== 'tiny';
     let head = `<div class="head"><div class="label"></div><div class="days">`;
     for (let k = 0; k < n; k++) {
       const d = dateOf(i0 + k), wd = (d.getDay() + 6) % 7;
-      const txt = mode === 'full' ? `${T.wd[wd]}<b>${d.getDate()}</b>` : mode === 'num' ? `<b>${d.getDate()}</b>` : (wd === 0 ? `<b class="mtiny">${d.getDate()}</b>` : '');
-      head += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 0 ? ' mon' : ''}${i0 + k === todayI ? ' today' : ''}">${txt}</div>`;
+      head += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 0 ? ' mon' : ''}${i0 + k === todayI ? ' today' : ''}">${showDays ? `<b>${d.getDate()}</b>` : '&nbsp;'}</div>`;
     }
     head += `</div></div>`;
 
@@ -282,7 +299,7 @@
       const bars = list.map(x => {
         const color = x.b.color || rowColor[x.b.row_id] || '#888888';
         const left = (x.s - i0) * DW + 1, width = Math.max(4, (x.e - x.s) * DW - 2);
-        return `<div class="bar" style="left:${left}px;width:${width}px;top:${6 + x.lane * 28}px;background:${esc(color)};${width < 26 ? 'padding:0' : ''}" title="${esc([x.b.label, x.b.episode, x.b.work_type].filter(Boolean).join(' · '))}">${width >= 26 ? barText(x.b) : ''}</div>`;
+        return `<div class="bar" style="left:${left}px;width:${width}px;top:${6 + x.lane * 28}px;background:${esc(color)};${width < 26 ? 'padding:0' : ''}" title="${esc(barParts(x.b).join(' · '))}">${width >= 26 ? barText(x.b) : ''}</div>`;
       }).join('');
       const line = todayI >= i0 && todayI < i0 + n ? `<div class="todayLine" style="left:${(todayI - i0 + (now.getHours() * 60 + now.getMinutes()) / 1440) * DW}px"></div>` : '';
       rows += `<div class="row"><div class="label"><span class="dot${r.category === 'studio' ? ' studio' : ''}" style="background:${esc(r.color || '#888')}"></span><span>${esc(r.label)}</span></div><div class="days">${dayCells(h)}${bars}${line}</div></div>`;
@@ -292,7 +309,7 @@
     const grid = $('grid');
     grid.style.setProperty('--dw', DW + 'px');
     grid.className = `grid ${mode}`;
-    grid.innerHTML = monthRow + head + (data.rows.length ? rows : `<div class="empty">${T.none}</div>`);
+    grid.innerHTML = monthRow + weekRow + head + (data.rows.length ? rows : `<div class="empty">${T.none}</div>`);
 
     renderScrubber(i0, n);
     $('foot').textContent = [T.readOnly, data.expires_at ? T.expires(new Date(data.expires_at).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })) : ''].filter(Boolean).join(' ');
