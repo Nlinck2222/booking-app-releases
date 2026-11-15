@@ -74,7 +74,9 @@
   .grid.tiny .day { border-right-color: transparent; }
   .grid.tiny .day.mon { box-shadow: inset 1px 0 0 var(--grid); }
   .head .day { position: relative; }
-  .scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; background: var(--card); border-radius: 12px; }
+  /* Kun vandret rulning, når der er brug for den (2026-11-15): dagene går 1 px ned over rækkernes bundstreg, og den
+     nederste række gav ellers en lodret scrollbar, der også tvang en vandret frem */
+  .scroller { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; background: var(--card); border-radius: 12px; }
   .grid { position: relative; min-width: max-content; }
   .head, .row { display: flex; border-bottom: 1px solid var(--line); }
   .head { background: var(--head); }
