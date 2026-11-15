@@ -6,6 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <title>Projektmappe</title>
+<script>try { var t = localStorage.getItem('projektTheme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <!--
   Delt projektmappe (booking-appens v895, src/projectShare.tsx, migration 061). Udgives med scripts/publish-reply-page.sh
   til GitHub Pages (Nlinck2222/booking-app-releases → /projekt/). Linket har ?k=<token>. Kun visning: siden kalder
@@ -18,10 +19,14 @@
           /* Nu-linjen som i appen (theme.ts playheadLineTimeline/-Glow): blå i lyst tema, lys gul i mørkt (2026-11-15);
              også dagens dato og i dag-stregen i scrubberen */
           --now: #0077ff; --nowGlow: rgba(0, 0, 0, 0.3); }
+  /* Tema (2026-11-15, Nicolai): følger computeren, indtil man vælger med knappen øverst; valget huskes i browseren */
+  :root { color-scheme: light; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #111113; --card: #1c1c1f; --text: #f5f5f7; --muted: #a1a1a6; --line: #2c2c30; --grid: #26262a; --weekend: #202024;
-            --barText: #ffffff; --btn: #2a2a2e; --now: #fff0c0; --nowGlow: #fff9e7; }
+    :root:not([data-theme="light"]) { --bg: #111113; --card: #1c1c1f; --text: #f5f5f7; --muted: #a1a1a6; --line: #2c2c30; --grid: #26262a; --weekend: #202024;
+            --barText: #ffffff; --btn: #2a2a2e; --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
   }
+  :root[data-theme="dark"] { --bg: #111113; --card: #1c1c1f; --text: #f5f5f7; --muted: #a1a1a6; --line: #2c2c30; --grid: #26262a; --weekend: #202024;
+            --barText: #ffffff; --btn: #2a2a2e; --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
   /* Bredden følger vinduet (2026-11-15, Nicolai): passer på den mindste MacBook (1280 punkter), vokser på større skærme */
@@ -45,7 +50,6 @@
   .grid.tiny .day { border-right-color: transparent; }
   .grid.tiny .day.mon { box-shadow: inset 1px 0 0 var(--grid); }
   .head .day { position: relative; }
-  :root { color-scheme: light dark; }
   .scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; background: var(--card); border-radius: 12px; }
   .grid { position: relative; min-width: max-content; }
   .head, .row { display: flex; border-bottom: 1px solid var(--line); }
@@ -105,6 +109,7 @@
         <div class="month" id="month"></div>
         <button id="next" aria-label="›">›</button>
         <button id="today"></button>
+        <button id="theme"></button>
       </div>
     </header>
     <div class="card scroller"><div class="grid" id="grid"></div></div>
@@ -122,12 +127,12 @@
   document.documentElement.lang = lang;
   const T = {
     da: { invalidTitle: 'Linket virker ikke længere', invalidText: 'Det er måske stoppet eller udløbet. Kontakt den, der delte det med dig.',
-          today: 'I dag', none: 'Ingen bookinger.', project: p => `Projekt: ${p}`,
+          today: 'I dag', none: 'Ingen bookinger.', light: 'Lyst tema', dark: 'Mørkt tema', project: p => `Projekt: ${p}`,
           expires: d => `Linket udløber ${d}.`, readOnly: 'Kun visning. Siden opdaterer sig selv.', 
           months: ['Januar','Februar','Marts','April','Maj','Juni','Juli','August','September','Oktober','November','December'],
           mShort: ['JAN','FEB','MAR','APR','MAJ','JUN','JUL','AUG','SEP','OKT','NOV','DEC'] },
     en: { invalidTitle: 'This link no longer works', invalidText: 'It may have been stopped or expired. Contact the person who shared it with you.',
-          today: 'Today', none: 'No bookings.', project: p => `Project: ${p}`,
+          today: 'Today', none: 'No bookings.', light: 'Light theme', dark: 'Dark theme', project: p => `Project: ${p}`,
           expires: d => `The link expires ${d}.`, readOnly: 'View only. The page updates itself.', 
           months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
           mShort: ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'] },
@@ -142,9 +147,16 @@
 
   // Zoom som i appen (Nicolai: "man skal kunne vælge hvor stort et view man vil se … som i appen med zoom knapperne").
   // Dagbredden fylder bredden ud; valget huskes i browseren
+  // Lyst/mørkt (2026-11-15): knappen viser det tema, man skifter til
+  const darkNow = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  const paintThemeBtn = () => { const b = $('theme'); const d = darkNow(); b.textContent = d ? '☀' : '☾'; b.title = d ? T.light : T.dark; b.setAttribute('aria-label', b.title); };
   const ZOOMS = [{ id: '7d', label: '7D' }, { id: '14d', label: '14D' }, { id: '1m', label: '1M' }, { id: '3m', label: '3M' }, { id: '6m', label: '6M' }];
   const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  if (['light', 'dark'].includes(lsGet('projektTheme'))) document.documentElement.dataset.theme = lsGet('projektTheme');
+  paintThemeBtn();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintThemeBtn);
+  $('theme').onclick = () => { const t = darkNow() ? 'light' : 'dark'; document.documentElement.dataset.theme = t; lsSet('projektTheme', t); paintThemeBtn(); };
   let zoom = ZOOMS.some(z => z.id === lsGet('projektZoom')) ? lsGet('projektZoom') : '1m';
   const months = z => ({ '1m': 1, '3m': 3, '6m': 6 }[z] || 0);
   // Periodens start (dag-indeks) for en dato: mandagen i ugen eller den 1. i måneden
