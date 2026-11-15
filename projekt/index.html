@@ -359,7 +359,8 @@
     // Dagens klasser: weekend (lør/søn, streg efter fre/søn), ferie/helligdag med kant ved periodens start og slut
     const dayCls = k => { const i = i0 + k, wd = (dateOf(i).getDay() + 6) % 7, hol = holidays.has(i);
       return `day${wd >= 5 ? ' we' : ''}${wd === 4 ? ' fri' : wd === 5 ? ' sat' : wd === 6 ? ' sun' : ''}${wd === 0 ? ' mon' : ''}${hol ? ' hol' : ''}${hol !== holidays.has(i + 1) ? ' hb' : ''}${k === 0 && hol ? ' hl' : ''}`; };
-    const dayCells = h => { let d = ''; for (let k = 0; k < n; k++) d += `<div class="${dayCls(k)}" style="height:${h}px"></div>`; return d; };
+    // Dagene går 1 px ned over rækkens bundstreg (2026-11-15), så weekend- og feriestreger ikke brydes ved hver række
+    const dayCells = h => { let d = ''; for (let k = 0; k < n; k++) d += `<div class="${dayCls(k)}" style="height:${h + 1}px;margin-bottom:-1px"></div>`; return d; };
 
     // Tre rækker som i appen (Nicolai 2026-11-15): måneder ("NOV 26"), ugenumre og dagens tal. Ved 3 og 6 måneder er
     // dagsrækken tom. Et stykke tekst vises kun, når der er plads til det
