@@ -328,13 +328,15 @@
     const monthRow = segRow('months', k => { const d = dateOf(i0 + k); return indexOf(new Date(d.getFullYear(), d.getMonth() + 1, 1)) - i0; },
       d => `${T.mShort[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`);
     const weekRow = segRow('weeks', k => k + 7 - ((dateOf(i0 + k).getDay() + 6) % 7), d => String(isoWeek(d)));
-    const showDays = months(zoom) < 3 && mode !== 'tiny';
+    // 3M: dagstallene mindre, som i appen (--day-font-size 8.5px, 2026-11-15); 6M: tom dagsrække
+    const small3m = zoom === '3m';
+    const showDays = (months(zoom) < 3 && mode !== 'tiny') || (small3m && DW >= 10);
     let head = `<div class="head"><div class="label"></div><div class="days">`;
     const is1d = zoom === '1d';
     for (let k = 0; k < n; k++) {
       const d = dateOf(i0 + k), wd = (d.getDay() + 6) % 7;
       const txt = is1d ? `<span class="h1date">${d.getDate()}.</span>${Array.from({ length: 24 }, (_, h) => `<span class="h1hour" style="left:${DW * h / 24}px">${String(h).padStart(2, '0')}</span>`).join('')}`
-        : showDays ? `<b>${d.getDate()}</b>` : '&nbsp;';
+        : showDays ? `<b${small3m ? ' style="font-size:8.5px;font-weight:600"' : ''}>${d.getDate()}</b>` : '&nbsp;';
       head += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 4 ? ' fri' : wd === 6 ? ' sun' : ''}${wd === 0 ? ' mon' : ''}${i0 + k === todayI ? ' today' : ''}">${txt}</div>`;
     }
     head += `</div></div>`;
