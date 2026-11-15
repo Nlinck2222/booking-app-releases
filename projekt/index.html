@@ -21,6 +21,7 @@
           --barText: #ffffff; --btn: #ffffff;
           --tabBg: #dfdfde; --tabActiveBg: #c4c4c4; --tabBorder: rgba(0, 0, 0, 0.51); --tabText: #7d7a73; --tabActiveText: #3c3728;
           --tabShadow: 0 1px 2px rgba(0, 0, 0, 0.43);
+          --hourLine: rgba(0, 0, 0, 0.08); --hourLineHead: rgba(0, 0, 0, 0.1);
           /* Nu-linjen som i appen (theme.ts playheadLineTimeline/-Glow): blå i lyst tema, lys gul i mørkt (2026-11-15);
              også dagens dato og i dag-stregen i scrubberen */
           --now: #0077ff; --nowGlow: rgba(0, 0, 0, 0.3); }
@@ -31,13 +32,15 @@
             --line: rgba(35, 32, 32, 0.75); --grid: rgba(255, 255, 255, 0.05); --weekendLine: rgba(122, 166, 224, 0.4); --btnBorder: rgba(255, 255, 255, 0.05);
             --barText: #ffffff; --btn: #282828;
             --tabBg: #3b3b3b; --tabActiveBg: #afafaf; --tabBorder: #222222; --tabText: #c0c0c0; --tabActiveText: #222222;
-            --tabShadow: 0 0 12px 1px rgba(0, 0, 0, 0.36); --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
+            --tabShadow: 0 0 12px 1px rgba(0, 0, 0, 0.36);
+            --hourLine: rgba(255, 255, 255, 0.03); --hourLineHead: rgba(255, 255, 255, 0.05); --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
   }
   :root[data-theme="dark"] { --bg: #373636; --card: #242323; --label: #373636; --head: #373636; --dayHead: #282727; --text: #e0e0e0; --muted: #818181;
             --line: rgba(35, 32, 32, 0.75); --grid: rgba(255, 255, 255, 0.05); --weekendLine: rgba(122, 166, 224, 0.4); --btnBorder: rgba(255, 255, 255, 0.05);
             --barText: #ffffff; --btn: #282828;
             --tabBg: #3b3b3b; --tabActiveBg: #afafaf; --tabBorder: #222222; --tabText: #c0c0c0; --tabActiveText: #222222;
-            --tabShadow: 0 0 12px 1px rgba(0, 0, 0, 0.36); --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
+            --tabShadow: 0 0 12px 1px rgba(0, 0, 0, 0.36);
+            --hourLine: rgba(255, 255, 255, 0.03); --hourLineHead: rgba(255, 255, 255, 0.05); --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
   /* Bredden følger vinduet (2026-11-15, Nicolai): passer på den mindste MacBook (1280 punkter), vokser på større skærme */
@@ -49,7 +52,7 @@
   h1 { font-size: 22px; margin: 0; line-height: 1.25; }
   .sub { font-size: 13px; color: var(--muted); margin: 2px 0 0; }
   .nav { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-  .nav button { border: 1px solid var(--btnBorder); background: var(--btn); color: var(--text); border-radius: 6px; height: 30px; min-width: 30px; padding: 0 10px; font: inherit; font-weight: 600; cursor: pointer; }
+  .nav button { border: 1px solid var(--tabBorder); background: var(--tabBg); color: var(--tabText); border-radius: 6px; height: 30px; min-width: 30px; padding: 0 10px; font: inherit; font-weight: 600; cursor: pointer; }
   .nav .month { min-width: 150px; text-align: center; font-weight: 700; white-space: nowrap; }
   .zooms { display: flex; border: 1px solid var(--tabBorder); border-radius: 6px; overflow: hidden; margin-right: 8px; }
   /* Zoomknapperne som appens (TimelineArea, tab-farverne i theme.ts) */
@@ -77,11 +80,17 @@
   .day { flex: 0 0 var(--dw); width: var(--dw); border-right: 1px solid var(--grid); }
   /* Weekenden som i appen: ingen baggrund, en streg efter fredag og søndag (getDayStyle) */
   .day.fri, .day.sun { border-right-color: var(--weekendLine); }
+  /* 1D som i appen (gridBg1D/gridHeader1D, DayHours1D): en streg pr. time, datoen øverst til venstre, timerne nederst */
+  .grid.h1d .row .day { background-image: var(--hours); }
+  .grid.h1d .head:not(.months):not(.weeks) .day { background-image: var(--hoursHead); height: 40px; padding: 0; position: relative; overflow: hidden; }
+  .h1date { position: absolute; top: 6px; left: calc(var(--dw) / 48); transform: translateX(-50%); font-size: 14px; font-weight: 800; color: var(--text); }
+  .h1hour { position: absolute; bottom: 4px; transform: translateX(-50%); font-size: 9px; font-weight: 600; color: var(--muted); }
   .head .day { text-align: center; font-size: 11px; color: var(--muted); padding: 6px 0; line-height: 1.2; }
   .head .day b { display: block; font-size: 12px; color: var(--text); }
   .head .day.today b { color: var(--now); }
   .todayLine { position: absolute; top: 0; bottom: 0; width: 1px; transform: translateX(-50%); background: var(--now); box-shadow: 0 0 2px var(--nowGlow); z-index: 2; pointer-events: none; }
-  .bar { position: absolute; height: 24px; border-radius: 4px; color: var(--barText); font-size: 11px; font-weight: 600; padding: 0 7px;
+  /* Bjælkehøjden (2026-11-15, Nicolai): højere end før (24), lidt lavere end appens ~38 */
+  .bar { position: absolute; height: 32px; border-radius: 4px; color: var(--barText); font-size: 11px; font-weight: 600; padding: 0 7px;
          display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 1;
          box-shadow: inset 0 -1px 0 rgba(0,0,0,.15); text-shadow: 0 1px 1px rgba(0,0,0,.25); }
   .bar .ep { opacity: .85; font-weight: 500; margin-left: 5px; }
@@ -165,7 +174,7 @@
   // Lyst/mørkt (2026-11-15): knappen viser det tema, man skifter til
   const darkNow = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
   const paintThemeBtn = () => { const b = $('theme'); const d = darkNow(); b.textContent = d ? '☀' : '☾'; b.title = d ? T.light : T.dark; b.setAttribute('aria-label', b.title); };
-  const ZOOMS = [{ id: '7d', label: '7D' }, { id: '14d', label: '14D' }, { id: '1m', label: '1M' }, { id: '3m', label: '3M' }, { id: '6m', label: '6M' }];
+  const ZOOMS = [{ id: '1d', label: '1D' }, { id: '7d', label: '7D' }, { id: '14d', label: '14D' }, { id: '1m', label: '1M' }, { id: '3m', label: '3M' }, { id: '6m', label: '6M' }];
   const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
   if (['light', 'dark'].includes(lsGet('projektTheme'))) document.documentElement.dataset.theme = lsGet('projektTheme');
@@ -175,10 +184,11 @@
   let zoom = ZOOMS.some(z => z.id === lsGet('projektZoom')) ? lsGet('projektZoom') : '1m';
   const months = z => ({ '1m': 1, '3m': 3, '6m': 6 }[z] || 0);
   // Periodens start (dag-indeks) for en dato: mandagen i ugen eller den 1. i måneden
-  const periodStart = (d, z) => months(z) ? indexOf(new Date(d.getFullYear(), d.getMonth(), 1)) : indexOf(d) - ((d.getDay() + 6) % 7);
+  const days = z => ({ '1d': 1, '7d': 7, '14d': 14 }[z]);
+  const periodStart = (d, z) => months(z) ? indexOf(new Date(d.getFullYear(), d.getMonth(), 1)) : z === '1d' ? indexOf(d) : indexOf(d) - ((d.getDay() + 6) % 7);
   // Efter scrubberen kan perioden starte midt i en måned — så bruges samme dato i måneden
-  const periodLen = (i0, z) => { if (!months(z)) return z === '7d' ? 7 : 14; const d = dateOf(i0); return indexOf(new Date(d.getFullYear(), d.getMonth() + months(z), d.getDate())) - i0; };
-  const shiftStart = (i0, z, dir) => { if (!months(z)) return i0 + dir * (z === '7d' ? 7 : 14); const d = dateOf(i0); return indexOf(new Date(d.getFullYear(), d.getMonth() + dir * months(z), d.getDate())); };
+  const periodLen = (i0, z) => { if (!months(z)) return days(z); const d = dateOf(i0); return indexOf(new Date(d.getFullYear(), d.getMonth() + months(z), d.getDate())) - i0; };
+  const shiftStart = (i0, z, dir) => { if (!months(z)) return i0 + dir * days(z); const d = dateOf(i0); return indexOf(new Date(d.getFullYear(), d.getMonth() + dir * months(z), d.getDate())); };
 
   let data = null;
   const now = new Date();
@@ -239,6 +249,7 @@
   const locale = lang === 'da' ? 'da-DK' : 'en-GB';
   const periodLabel = (i0, n) => {
     const a = dateOf(i0), z = dateOf(i0 + n - 1);
+    if (n === 1) return a.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
     const aligned = a.getDate() === 1;
     if (aligned && months(zoom) === 1) return `${T.months[a.getMonth()]} ${a.getFullYear()}`;
     if (aligned && months(zoom)) return `${T.months[a.getMonth()].slice(0, 3)}${a.getFullYear() !== z.getFullYear() ? ' ' + a.getFullYear() : ''} – ${T.months[z.getMonth()].slice(0, 3)} ${z.getFullYear()}`;
@@ -317,9 +328,12 @@
     const weekRow = segRow('weeks', k => k + 7 - ((dateOf(i0 + k).getDay() + 6) % 7), d => String(isoWeek(d)));
     const showDays = months(zoom) < 3 && mode !== 'tiny';
     let head = `<div class="head"><div class="label"></div><div class="days">`;
+    const is1d = zoom === '1d';
     for (let k = 0; k < n; k++) {
       const d = dateOf(i0 + k), wd = (d.getDay() + 6) % 7;
-      head += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 4 ? ' fri' : wd === 6 ? ' sun' : ''}${wd === 0 ? ' mon' : ''}${i0 + k === todayI ? ' today' : ''}">${showDays ? `<b>${d.getDate()}</b>` : '&nbsp;'}</div>`;
+      const txt = is1d ? `<span class="h1date">${d.getDate()}.</span>${Array.from({ length: 24 }, (_, h) => `<span class="h1hour" style="left:${DW * h / 24}px">${String(h).padStart(2, '0')}</span>`).join('')}`
+        : showDays ? `<b>${d.getDate()}</b>` : '&nbsp;';
+      head += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 4 ? ' fri' : wd === 6 ? ' sun' : ''}${wd === 0 ? ' mon' : ''}${i0 + k === todayI ? ' today' : ''}">${txt}</div>`;
     }
     head += `</div></div>`;
 
@@ -335,20 +349,25 @@
       // Spor, så overlappende bookinger ligger under hinanden
       const lanes = [];
       for (const x of list) { let l = lanes.findIndex(end => end <= x.s + 1e-6); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = x.e; x.lane = l; }
-      const h = Math.max(1, lanes.length) * 28 + 8;
+      const LANE = 36;   // 32 px bjælke + 4 px luft
+      const h = Math.max(1, lanes.length) * LANE + 8;
       const bars = list.map(x => {
         const color = x.b.color || rowColor[x.b.row_id] || '#888888';
         const left = (x.s - i0) * DW + 1, width = Math.max(4, (x.e - x.s) * DW - 2);
-        return `<div class="bar" style="left:${left}px;width:${width}px;top:${6 + x.lane * 28}px;background:${esc(color)};${width < 26 ? 'padding:0' : ''}" title="${esc(barParts(x.b).join(' · '))}">${width >= 26 ? barText(x.b) : ''}</div>`;
+        return `<div class="bar" style="left:${left}px;width:${width}px;top:${6 + x.lane * LANE}px;background:${esc(color)};${width < 26 ? 'padding:0' : ''}" title="${esc(barParts(x.b).join(' · '))}">${width >= 26 ? barText(x.b) : ''}</div>`;
       }).join('');
       const line = todayI >= i0 && todayI < i0 + n ? `<div class="todayLine" style="left:${(todayI - i0 + (now.getHours() * 60 + now.getMinutes()) / 1440) * DW}px"></div>` : '';
       rows += `<div class="row"><div class="label"><span class="dot${r.category === 'studio' ? ' studio' : ''}" style="background:${esc(r.color || '#888')}"></span><span>${esc(r.label)}</span></div><div class="days">${dayCells(h)}${bars}${line}</div></div>`;
     }
     // En tom række under den sidste (Nicolai), samme højde som en række med én bjælke
-    if (data.rows.length) rows += `<div class="row"><div class="label"></div><div class="days">${dayCells(36)}</div></div>`;
+    if (data.rows.length) rows += `<div class="row"><div class="label"></div><div class="days">${dayCells(44)}</div></div>`;
     const grid = $('grid');
     grid.style.setProperty('--dw', DW + 'px');
-    grid.className = `grid ${mode}`;
+    // Timestregerne i hele pixels, som appens gridBg1D (WebKit rammer ikke procenter præcist)
+    const hourStops = c => { const st = []; for (let i = 1; i < 24; i++) { const x = Math.round(i / 24 * DW); st.push(`transparent ${x - 1}px`, `var(${c}) ${x - 1}px`, `var(${c}) ${x}px`, `transparent ${x}px`); } return `linear-gradient(to right, ${st.join(', ')})`; };
+    grid.style.setProperty('--hours', is1d ? hourStops('--hourLine') : 'none');
+    grid.style.setProperty('--hoursHead', is1d ? hourStops('--hourLineHead') : 'none');
+    grid.className = `grid ${mode}${is1d ? ' h1d' : ''}`;
     grid.innerHTML = monthRow + weekRow + head + (data.rows.length ? rows : `<div class="empty">${T.none}</div>`);
 
     renderScrubber(i0, n);
