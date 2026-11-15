@@ -22,6 +22,9 @@
           --tabBg: #dfdfde; --tabActiveBg: #c4c4c4; --tabBorder: rgba(0, 0, 0, 0.51); --tabText: #7d7a73; --tabActiveText: #3c3728;
           --tabShadow: 0 1px 2px rgba(0, 0, 0, 0.43);
           --hourLine: rgba(0, 0, 0, 0.08); --hourLineHead: rgba(0, 0, 0, 0.1);
+          /* Weekender og ferier/helligdage som appen (theme.ts saturday/sundayBg, -HeaderBg, holidayBg/-Border/-Red) */
+          --satBg: rgba(77, 67, 35, 0.045); --sunBg: rgba(77, 67, 35, 0.035); --satHead: rgba(77, 67, 35, 0.10); --sunHead: rgba(77, 67, 35, 0.08);
+          --holBg: rgba(208, 24, 0, 0.21); --holBorder: rgba(208, 24, 0, 0.39); --holRed: rgb(179, 21, 0);
           /* Nu-linjen som i appen (theme.ts playheadLineTimeline/-Glow): blå i lyst tema, lys gul i mørkt (2026-11-15);
              også dagens dato og i dag-stregen i scrubberen */
           --now: #0077ff; --nowGlow: rgba(0, 0, 0, 0.3); }
@@ -33,14 +36,18 @@
             --barText: #ffffff; --btn: #282828;
             --tabBg: #3b3b3b; --tabActiveBg: #afafaf; --tabBorder: #222222; --tabText: #c0c0c0; --tabActiveText: #222222;
             --tabShadow: 0 0 12px 1px rgba(0, 0, 0, 0.36);
-            --hourLine: rgba(255, 255, 255, 0.03); --hourLineHead: rgba(255, 255, 255, 0.05); --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
+            --hourLine: rgba(255, 255, 255, 0.03); --hourLineHead: rgba(255, 255, 255, 0.05);
+            --satBg: rgba(122, 166, 224, 0.035); --sunBg: rgba(122, 166, 224, 0.025); --satHead: rgba(122, 166, 224, 0.10); --sunHead: rgba(122, 166, 224, 0.08);
+            --holBg: rgba(255, 75, 75, 0.08); --holBorder: rgba(255, 75, 75, 0.31); --holRed: #FF4B4B; --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
   }
   :root[data-theme="dark"] { --bg: #373636; --card: #242323; --label: #373636; --head: #373636; --dayHead: #282727; --text: #e0e0e0; --muted: #818181;
             --line: rgba(35, 32, 32, 0.75); --grid: rgba(255, 255, 255, 0.05); --weekendLine: rgba(122, 166, 224, 0.4); --btnBorder: rgba(255, 255, 255, 0.05);
             --barText: #ffffff; --btn: #282828;
             --tabBg: #3b3b3b; --tabActiveBg: #afafaf; --tabBorder: #222222; --tabText: #c0c0c0; --tabActiveText: #222222;
             --tabShadow: 0 0 12px 1px rgba(0, 0, 0, 0.36);
-            --hourLine: rgba(255, 255, 255, 0.03); --hourLineHead: rgba(255, 255, 255, 0.05); --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
+            --hourLine: rgba(255, 255, 255, 0.03); --hourLineHead: rgba(255, 255, 255, 0.05);
+            --satBg: rgba(122, 166, 224, 0.035); --sunBg: rgba(122, 166, 224, 0.025); --satHead: rgba(122, 166, 224, 0.10); --sunHead: rgba(122, 166, 224, 0.08);
+            --holBg: rgba(255, 75, 75, 0.08); --holBorder: rgba(255, 75, 75, 0.31); --holRed: #FF4B4B; --now: #fff0c0; --nowGlow: #fff9e7; color-scheme: dark; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
   /* Bredden følger vinduet (2026-11-15, Nicolai): passer på den mindste MacBook (1280 punkter), vokser på større skærme */
@@ -80,6 +87,15 @@
   .day { flex: 0 0 var(--dw); width: var(--dw); border-right: 1px solid var(--grid); }
   /* Weekenden som i appen: ingen baggrund, en streg efter fredag og søndag (getDayStyle) */
   .day.fri, .day.sun { border-right-color: var(--weekendLine); }
+  /* Lørdag og søndag med appens svage farve, kraftigere i dato-rækken; ferier/helligdage røde med rød kant kun ved
+     periodens start og slut (getDayStyle, 2026-11-15) */
+  .day.sat { background-color: var(--satBg); } .day.sun { background-color: var(--sunBg); }
+  .head .day.sat { background-color: var(--satHead); } .head .day.sun { background-color: var(--sunHead); }
+  .day.hol, .head .day.hol { background-color: var(--holBg); }
+  .day.hol.fri, .day.hol.sun { border-right-color: var(--grid); }
+  .day.hb { border-right-color: var(--holBorder); }
+  .day.hl { box-shadow: inset 1px 0 0 var(--holBorder); }
+  .head .day.hol b, .head .day.hol .h1date { color: var(--holRed); }
   /* 1D som i appen (gridBg1D/gridHeader1D, DayHours1D): en streg pr. time, datoen øverst til venstre, timerne nederst */
   .grid.h1d .row .day { background-image: var(--hours); }
   .grid.h1d .head:not(.months):not(.weeks) .day { background-image: var(--hoursHead); height: 40px; padding: 0; position: relative; overflow: hidden; }
@@ -212,6 +228,7 @@
       if (!d) return showInvalid();
       const first = !data;
       data = d;
+      holidays = buildHolidays(d.holidays);
       if (first) {
         // Åbn ved den første kommende booking, hvis perioden er tom
         const n = periodLen(start, zoom), todayI = indexOf(now);
@@ -246,6 +263,30 @@
   };
   const barText = b => barParts(b).map((p, i) => i ? `<span class="ep">· ${esc(p)}</span>` : esc(p)).join('');
   // Ugenummer (ISO), som getWeekNumber i appen
+  // Ferier og helligdage (migration 074) som dag-indeks → navn; gentagelser foldes ud som appens
+  // expandRepeatingHolidays (holidayRepeat.ts): 'week' = samme ISO-uge og ugedag, 'date' = samme dato, til og med om 2 år
+  let holidays = new Map();
+  const pd = s => { const p = String(s || '').split('-').map(Number); return p.length === 3 && p.every(x => !isNaN(x)) ? new Date(p[0], p[1] - 1, p[2]) : null; };
+  const addD = (d, k) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + k);
+  const isoYW = d => { const th = addD(d, 3 - ((d.getDay() + 6) % 7)), w1 = new Date(th.getFullYear(), 0, 4);
+    return { year: th.getFullYear(), week: 1 + Math.round(((th - w1) / 86400000 - 3 + ((w1.getDay() + 6) % 7)) / 7) }; };
+  const ofIsoWeek = (y, w, wd) => { const j4 = new Date(y, 0, 4), m1 = addD(j4, -((j4.getDay() + 6) % 7)), d = addD(m1, (w - 1) * 7 + wd); return isoYW(d).year === y ? d : null; };
+  const buildHolidays = list => {
+    const map = new Map(), last = now.getFullYear() + 2;
+    const mark = (s, e, name) => { for (let d = s; d <= e; d = addD(d, 1)) if (!map.has(indexOf(d))) map.set(indexOf(d), name || ''); };
+    for (const h of list || []) {
+      const s = pd(h.start); if (!s) continue;
+      const e = pd(h.end) || s, len = Math.max(0, Math.round((e - s) / 86400000));
+      mark(s, addD(s, len), h.name);
+      if (h.repeat !== 'week' && h.repeat !== 'date') continue;
+      const { year: fy, week } = isoYW(s), wd = (s.getDay() + 6) % 7;
+      for (let y = (h.repeat === 'week' ? fy : s.getFullYear()) + 1; y <= last; y++) {
+        const ns = h.repeat === 'week' ? ofIsoWeek(y, week, wd) : new Date(y, s.getMonth(), Math.min(s.getDate(), new Date(y, s.getMonth() + 1, 0).getDate()));
+        if (ns) mark(ns, addD(ns, len), h.name);
+      }
+    }
+    return map;
+  };
   const isoWeek = d => { const t = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7) + 3); const y = new Date(t.getFullYear(), 0, 4);
     return 1 + Math.round(((t - y) / 86400000 - 3 + ((y.getDay() + 6) % 7)) / 7); };
   const locale = lang === 'da' ? 'da-DK' : 'en-GB';
@@ -312,7 +353,10 @@
     const mode = DW >= 26 ? 'full' : DW >= 16 ? 'num' : 'tiny';
     const rowColor = Object.fromEntries(data.rows.map(r => [r.id, r.color]));
     const visible = data.bookings.filter(b => b.start_day <= i0 + n - 1 && b.start_day + Math.max(1, b.duration) - 1 >= i0);
-    const dayCells = h => { let d = ''; for (let k = 0; k < n; k++) { const wd = (dateOf(i0 + k).getDay() + 6) % 7; d += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 4 ? ' fri' : wd === 6 ? ' sun' : ''}${wd === 0 ? ' mon' : ''}" style="height:${h}px"></div>`; } return d; };
+    // Dagens klasser: weekend (lør/søn, streg efter fre/søn), ferie/helligdag med kant ved periodens start og slut
+    const dayCls = k => { const i = i0 + k, wd = (dateOf(i).getDay() + 6) % 7, hol = holidays.has(i);
+      return `day${wd >= 5 ? ' we' : ''}${wd === 4 ? ' fri' : wd === 5 ? ' sat' : wd === 6 ? ' sun' : ''}${wd === 0 ? ' mon' : ''}${hol ? ' hol' : ''}${hol !== holidays.has(i + 1) ? ' hb' : ''}${k === 0 && hol ? ' hl' : ''}`; };
+    const dayCells = h => { let d = ''; for (let k = 0; k < n; k++) d += `<div class="${dayCls(k)}" style="height:${h}px"></div>`; return d; };
 
     // Tre rækker som i appen (Nicolai 2026-11-15): måneder ("NOV 26"), ugenumre og dagens tal. Ved 3 og 6 måneder er
     // dagsrækken tom. Et stykke tekst vises kun, når der er plads til det
@@ -337,7 +381,8 @@
       const d = dateOf(i0 + k), wd = (d.getDay() + 6) % 7;
       const txt = is1d ? `<span class="h1date">${d.getDate()}.</span>${Array.from({ length: 24 }, (_, h) => `<span class="h1hour" style="left:${DW * h / 24}px">${String(h).padStart(2, '0')}</span>`).join('')}`
         : showDays ? `<b${small3m ? ' style="font-size:8.5px;font-weight:600"' : ''}>${d.getDate()}</b>` : '&nbsp;';
-      head += `<div class="day${wd >= 5 ? ' we' : ''}${wd === 4 ? ' fri' : wd === 6 ? ' sun' : ''}${wd === 0 ? ' mon' : ''}${i0 + k === todayI ? ' today' : ''}">${txt}</div>`;
+      const hn = holidays.get(i0 + k);
+      head += `<div class="${dayCls(k)}${i0 + k === todayI ? ' today' : ''}"${hn ? ` title="${esc(hn)}"` : ''}>${txt}</div>`;
     }
     head += `</div></div>`;
 
